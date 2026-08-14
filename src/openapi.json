@@ -1,0 +1,76 @@
+{
+  "openapi": "3.1.0",
+  "info": {"title": "급식 배틀 내부 API", "version": "1.0.0"},
+  "paths": {
+    "/api/schools": {
+      "get": {
+        "operationId": "searchSchools",
+        "parameters": [
+          {"name": "name", "in": "query", "required": true, "schema": {"type": "string", "minLength": 2}},
+          {"name": "page", "in": "query", "schema": {"type": "integer", "minimum": 1, "default": 1}},
+          {"name": "size", "in": "query", "schema": {"type": "integer", "minimum": 1, "maximum": 100, "default": 50}}
+        ],
+        "responses": {
+          "200": {"description": "학교 검색 결과", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/SchoolList"}}}},
+          "400": {"$ref": "#/components/responses/Error"}
+        }
+      }
+    },
+    "/api/meals": {
+      "get": {
+        "operationId": "getMeals",
+        "parameters": [
+          {"name": "officeCode", "in": "query", "required": true, "schema": {"type": "string", "minLength": 1}},
+          {"name": "schoolCode", "in": "query", "required": true, "schema": {"type": "string", "minLength": 1}},
+          {"name": "fromDate", "in": "query", "required": true, "schema": {"type": "string", "format": "date"}},
+          {"name": "toDate", "in": "query", "required": true, "schema": {"type": "string", "format": "date"}}
+        ],
+        "responses": {
+          "200": {"description": "급식 목록", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/MealList"}}}},
+          "400": {"$ref": "#/components/responses/Error"},
+          "502": {"$ref": "#/components/responses/Error"},
+          "504": {"$ref": "#/components/responses/Error"}
+        }
+      }
+    },
+    "/api/health": {
+      "get": {
+        "operationId": "health",
+        "responses": {"200": {"description": "정상", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Health"}}}}}
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "School": {
+        "type": "object",
+        "required": ["officeCode", "officeName", "schoolCode", "schoolName", "schoolKind", "address"],
+        "properties": {
+          "officeCode": {"type": "string"}, "officeName": {"type": "string"},
+          "schoolCode": {"type": "string"}, "schoolName": {"type": "string"},
+          "schoolKind": {"type": "string"}, "address": {"type": "string"}
+        }
+      },
+      "SchoolList": {
+        "type": "object", "required": ["items", "totalCount"],
+        "properties": {"items": {"type": "array", "items": {"$ref": "#/components/schemas/School"}}, "totalCount": {"type": "integer", "minimum": 0}}
+      },
+      "Meal": {
+        "type": "object", "required": ["date", "mealType", "dishes", "calorie", "origin"],
+        "properties": {
+          "date": {"type": "string", "format": "date"}, "mealType": {"type": "string", "const": "중식"},
+          "dishes": {"type": "array", "items": {"type": "string"}}, "calorie": {"type": "string"}, "origin": {"type": "string"}
+        }
+      },
+      "MealList": {"type": "object", "required": ["items"], "properties": {"items": {"type": "array", "items": {"$ref": "#/components/schemas/Meal"}}}},
+      "Health": {"type": "object", "required": ["status"], "properties": {"status": {"type": "string", "const": "ok"}}},
+      "ErrorResponse": {
+        "type": "object", "required": ["error"],
+        "properties": {"error": {"type": "object", "required": ["code", "message"], "properties": {"code": {"type": "string"}, "message": {"type": "string"}}}}
+      }
+    },
+    "responses": {
+      "Error": {"description": "오류", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ErrorResponse"}}}}
+    }
+  }
+}
