@@ -33,6 +33,29 @@ services:
       - app
     restart: unless-stopped
 
+  mcp:
+    build:
+      context: ./src/mcp
+    environment:
+      NEIS_API_KEY: ${NEIS_API_KEY:-}
+      MCP_HOST: 0.0.0.0
+      MCP_PORT: "8080"
+    ports:
+      - "8080:8080"
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - "import urllib.request; urllib.request.urlopen('http://localhost:8080/health')"
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 5s
+    networks:
+      - app
+    restart: unless-stopped
+
 networks:
   app:
     internal: false

@@ -2,13 +2,14 @@
 
 이 문서는 현재 저장소에서 작업하는 AI 코딩 에이전트를 위한 가이드입니다.
 제품 요구사항은 `PRD.md`, 기술 결정과 시스템 구조는 `TRD.md`를 우선합니다.
-워크숍의 후속 단계에 해당하는 MCP·Agent·데이터베이스 코드는 아직 이 저장소에
+워크숍의 후속 단계에 해당하는 Agent·데이터베이스 코드는 아직 이 저장소에
 구현되어 있지 않으므로, 실제 파일과 스크립트를 기준으로 작업합니다.
 
 ## 1. 프로젝트 개요
 
 NEIS 공개 API에서 학교 기본 정보와 중식 급식 정보를 조회하는 풀스택 앱입니다.
-프런트엔드는 React·TypeScript·Vite·Fluent UI, 백엔드는 FastAPI·httpx로 구성됩니다.
+프런트엔드는 React·TypeScript·Vite·Fluent UI, 백엔드는 FastAPI·httpx로 구성되며,
+AI 에이전트용으로 동일한 데이터를 도구로 노출하는 Python MCP 서버를 함께 제공합니다.
 
 - 급식 조회는 중식(`MMEAL_SC_CODE=2`)만 사용합니다.
 - 브라우저는 NEIS API를 직접 호출하지 않고 백엔드의 `/api/*`만 호출합니다.
@@ -32,6 +33,7 @@ NEIS 공개 API에서 학교 기본 정보와 중식 급식 정보를 조회하�
 └── src/
     ├── openapi.json      프런트엔드·백엔드 내부 API 계약
     ├── api/              FastAPI 백엔드와 pytest 테스트
+    ├── mcp/              MCP 서버(Streamable HTTP)와 pytest 테스트
     ├── web/              React·Vite·Fluent UI 프런트엔드
     └── e2e/              Playwright 브라우저 테스트
 ```
@@ -49,8 +51,18 @@ NEIS 공개 API에서 학교 기본 정보와 중식 급식 정보를 조회하�
 - `tests/unit/`: 날짜·메뉴 정규화와 도메인 규칙 테스트
 - `tests/integration/`: FastAPI 라우터와 모킹한 NEIS HTTP 통합 테스트
 
-### 프런트엔드 (`src/web/`)
+### MCP 서버 (`src/mcp/`)
 
+- `app/server.py`: `FastMCP` 서버 생성, 도구 정의, lifespan, `/health` 라우트
+- `app/main.py`: Streamable HTTP ASGI 앱(`app`)과 실행 진입점
+- `app/config.py`: NEIS 및 MCP 호스트·포트 설정
+- `app/neis_client.py`: MCP 전용 NEIS 비동기 클라이언트와 응답 정규화
+- `app/validation.py`: 검색어·학교 식별자·날짜 범위 검증과 `ToolInputError`
+- `app/schemas.py`: 도구 입출력 Pydantic 모델
+- `tests/unit/`: 검증·정규화 순수 함수 테스트
+- `tests/integration/`: MCP 인메모리 세션 기반 도구 목록·호출 테스트
+
+### 프런트엔드 (`src/web/`)
 - `src/App.tsx`: 학교 검색 → 기간 선택 → 급식 확인 3단계 화면과 상태 관리
 - `src/lib/api.ts`: 백엔드 `/api/*` 호출 및 `ApiError` 변환
 - `src/styles.css`: 화면 스타일
@@ -67,6 +79,7 @@ NEIS 공개 API에서 학교 기본 정보와 중식 급식 정보를 조회하�
 | 영역 | 요구 도구 |
 | --- | --- |
 | 백엔드 | Python 3.12+, `uv`, FastAPI, httpx, pytest, respx |
+| MCP 서버 | Python 3.12+, `uv`, MCP Python SDK 1.x, httpx, pytest, respx |
 | 프런트엔드 | Node.js 20.19+ 또는 22.13+, npm, React, Vite, TypeScript |
 | E2E | Playwright, Chromium |
 | 실행·배포 | Docker Desktop, Docker Compose |
@@ -81,6 +94,11 @@ API 키와 기타 시크릿은 커밋하거나 로그·명령 기록에 출력�
 - `NEIS_MAX_RETRIES`: 기본값 2회, 최대 5회
 - `CORS_ORIGINS`: 쉼표로 구분한 허용 오리진 목록, 기본값 `http://localhost:3000`
 
+MCP 서버는 위 `NEIS_*` 변수와 함께 다음을 지원합니다.
+
+- `MCP_HOST`: 바인딩 호스트, 기본값 `0.0.0.0`
+- `MCP_PORT`: 바인딩 포트, 기본값 `8080`
+
 ## 4. 설치·실행·검증 명령
 
 ### Docker Compose로 전체 앱 실행
@@ -94,7 +112,8 @@ docker compose down
 
 `run.ps1`은 Docker와 Compose를 확인하고 `.env`가 없으면 `.env.example`을
 복사한 뒤 `docker compose up --build`를 실행합니다. 웹은
-`http://localhost:3000`, API는 `http://localhost:8000`에서 제공됩니다.
+`http://localhost:3000`, API는 `http://localhost:8000`, MCP 서버는
+`http://localhost:8080/mcp`에서 제공됩니다.
 
 셸 스크립트가 필요한 환경에서는 다음을 사용합니다.
 
@@ -123,6 +142,26 @@ uv run pytest
 uv run pytest -m unit
 uv run pytest -m integration
 ```
+
+### MCP 서버
+
+```powershell
+cd src/mcp
+uv sync --all-groups
+uv run uvicorn app.main:app --host 127.0.0.1 --port 8080
+uv run pytest
+uv run pytest -m unit
+uv run pytest -m integration
+```
+
+MCP 인스펙터로 도구를 확인하려면 서버를 실행한 뒤 다음을 사용합니다.
+
+```powershell
+npx @modelcontextprotocol/inspector
+```
+
+인스펙터에서 전송 방식은 "Streamable HTTP", URL은 `http://localhost:8080/mcp`를
+입력합니다.
 
 ### 프런트엔드
 
@@ -154,6 +193,11 @@ Playwright에서 모킹하므로 실제 NEIS·AI 서비스에 연결하지 않�
 
 - 프런트엔드에서 `fetch`를 직접 사용하지 말고 `src/lib/api.ts`를 사용합니다.
 - 백엔드의 외부 HTTP 호출은 `NeisClient`(`app/neis_client.py`)를 통해서만 수행합니다.
+- MCP 서버는 백엔드 API(`src/api`)를 호출하지 않고 자체 `NeisClient`로 NEIS API와
+  직접 통신합니다. 두 서비스는 독립적으로 실행·배포합니다.
+- 새 MCP 도구는 `app/server.py`의 `create_server`에서 `@server.tool`로 등록하고,
+  입력 검증은 `app/validation.py`, 입출력 모델은 `app/schemas.py`에 정의합니다.
+- MCP 도구 오류는 `ToolError`로 발생시키며 사용자 안내 메시지만 포함합니다.
 - API 라우터는 `app/routers/`에 추가하고, 요청·응답은 Pydantic 모델로 정의합니다.
 - API 필드명과 쿼리 파라미터는 `src/openapi.json` 계약과 일치시킵니다.
   Python 내부 snake_case 필드는 Pydantic alias로 외부 camelCase를 유지합니다.
@@ -161,7 +205,7 @@ Playwright에서 모킹하므로 실제 NEIS·AI 서비스에 연결하지 않�
   줄바꿈을 제거한 뒤 날짜순으로 반환합니다.
 - 사용자에게 노출되는 API 오류는 `{ "error": { "code", "message" } }` 형식을
   사용합니다. NEIS 응답 본문·인증 정보·내부 예외를 그대로 반환하지 않습니다.
-- 새 Python 의존성은 `src/api`에서 `uv add`, 새 JavaScript 의존성은 해당
+- 새 Python 의존성은 `src/api` 또는 `src/mcp`에서 `uv add`, 새 JavaScript 의존성은 해당
   패키지 디렉터리에서 `npm install`로 추가하고 잠금 파일을 갱신합니다.
   잠금 파일을 수동 편집하지 않습니다.
 - 생성물과 캐시(`dist/`, `node_modules/`, `__pycache__/`, `.pytest_cache/`)는
@@ -174,6 +218,8 @@ Playwright에서 모킹하므로 실제 NEIS·AI 서비스에 연결하지 않�
 | --- | --- | --- | --- |
 | API 단위 | `src/api/tests/unit/` | pytest | 외부 I/O 없음 |
 | API 통합 | `src/api/tests/integration/` | pytest + respx | NEIS HTTP 모킹 |
+| MCP 단위 | `src/mcp/tests/unit/` | pytest | 외부 I/O 없음 |
+| MCP 통합 | `src/mcp/tests/integration/` | pytest + respx + MCP 인메모리 세션 | NEIS HTTP 모킹 |
 | Web | `src/web/src/**/*.test.*` | Vitest + RTL + MSW | `/api/*` 모킹 |
 | E2E | `src/e2e/tests/` | Playwright | `/api/*` 라우팅 모킹 |
 
@@ -182,7 +228,8 @@ Playwright에서 모킹하므로 실제 NEIS·AI 서비스에 연결하지 않�
   upstream 오류·타임아웃의 안전한 오류 응답을 검증합니다.
 - 실제 NEIS API, API 키, Azure 또는 모델 엔드포인트에 접근하는 테스트를
   만들지 않습니다.
-- 새 pytest 마커는 `src/api/pyproject.toml`의 `markers`에 등록합니다.
+- 새 pytest 마커는 `src/api/pyproject.toml` 또는 `src/mcp/pyproject.toml`의
+  `markers`에 등록합니다.
 
 ## 7. Git·PR 규칙
 
