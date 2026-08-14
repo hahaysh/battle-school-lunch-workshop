@@ -1,0 +1,38 @@
+services:
+  api:
+    build:
+      context: ./src/api
+    environment:
+      NEIS_API_KEY: ${NEIS_API_KEY:-}
+      CORS_ORIGINS: http://localhost:3000
+    ports:
+      - "8000:8000"
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/health')"
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 5s
+    networks:
+      - app
+    restart: unless-stopped
+
+  web:
+    build:
+      context: ./src/web
+    ports:
+      - "3000:8080"
+    depends_on:
+      api:
+        condition: service_healthy
+    networks:
+      - app
+    restart: unless-stopped
+
+networks:
+  app:
+    internal: false

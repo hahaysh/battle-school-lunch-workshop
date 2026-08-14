@@ -24,6 +24,20 @@ NEIS 공개 API를 활용해 초중고 급식 메뉴를 조회하고 AI 에이�
 
 이 저장소를 포크하는 대신 템플릿으로 새 저장소를 만든 후 [개발 환경 설정](docs/00-setup.md)의 안내를 따라 진행하세요.
 
+### 앱 한 번에 실행하기
+
+Docker Desktop을 실행한 뒤 저장소 루트에서 다음 명령을 실행합니다.
+
+```powershell
+.\scripts\run.ps1
+```
+
+```bash
+bash ./scripts/run.sh
+```
+
+스크립트는 `.env`가 없으면 `.env.example`을 복사하고 `docker compose up --build`를 실행합니다. 생성된 `.env`에 `NEIS_API_KEY`를 입력해야 실제 급식 조회가 가능합니다.
+
 > [!TIP]
 > 바로 시작하려면 [이 템플릿으로 새 저장소를 만드세요](https://github.com/new?template_name=battle-school-lunch-workshop&template_owner=devkimchi).
 
@@ -49,12 +63,30 @@ NEIS 공개 API를 활용해 초중고 급식 메뉴를 조회하고 AI 에이�
 
 ## 저장소 구성
 
-| 경로    | 설명                                 |
-|---------|--------------------------------------|
+| 경로 | 설명 |
+|------|------|
+| `src/api/` | FastAPI 백엔드와 pytest 테스트 |
+| `src/web/` | React·Vite·Fluent UI 프런트엔드와 통합 테스트 |
+| `src/e2e/` | Playwright E2E 테스트 |
+| `src/openapi.json` | 프런트엔드·백엔드 내부 API 계약 |
 | `data/` | API 명세 작성에 사용하는 원본 데이터 |
-| `docs/` | 단계별 워크숍 가이드                 |
+| `docs/` | 단계별 워크숍 가이드 |
 
-프론트엔드, 백엔드 및 배포 관련 소스는 워크숍을 진행하면서 참가자의 저장소에 생성됩니다.
+### 애플리케이션 실행
+
+루트의 `.env.example`을 `.env`로 복사하고 `NEIS_API_KEY`를 설정한 뒤 실행합니다.
+
+```bash
+docker compose up --build
+```
+
+브라우저에서 `http://localhost:3000`에 접속합니다. 로컬 검증 명령은 다음과 같습니다.
+
+```bash
+cd src/api && uv sync --all-groups && uv run pytest
+cd src/web && npm ci && npm test && npm run build
+cd src/e2e && npm ci && npx playwright install chromium && npm test
+```
 
 ## 추가 학습 자료
 

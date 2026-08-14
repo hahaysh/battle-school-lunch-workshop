@@ -1,0 +1,11 @@
+{
+  "name": "battle-school-lunch",
+  "private": true,
+  "scripts": {
+    "dev:web": "npm --prefix src/web run dev",
+    "build": "npm --prefix src/web run build",
+    "test:web": "npm --prefix src/web test",
+    "test:e2e": "npm --prefix src/e2e test"
+  }
+}
+
