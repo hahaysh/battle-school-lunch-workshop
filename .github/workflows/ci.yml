@@ -1,12 +1,14 @@
-name: CI
+name: CI and Azure Deployment
 
 on:
   push:
     branches: [main]
   pull_request:
     branches: [main]
+  workflow_dispatch:
 
 permissions:
+  id-token: write
   contents: read
 
 jobs:
@@ -59,3 +61,35 @@ jobs:
       - name: Await Compose scaffold
         if: ${{ hashFiles('compose.yml', 'compose.yaml', 'docker-compose.yml', 'docker-compose.yaml') == '' }}
         run: echo "No Compose file is present yet; skipping configuration validation."
+
+  deploy:
+    name: Deploy to Azure
+    if: ${{ github.event_name != 'pull_request' }}
+    needs: [frontend, backend, compose]
+    runs-on: ubuntu-latest
+    env:
+      AZURE_CLIENT_ID: ${{ vars.AZURE_CLIENT_ID }}
+      AZURE_TENANT_ID: ${{ vars.AZURE_TENANT_ID }}
+      AZURE_SUBSCRIPTION_ID: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+      AZURE_ENV_NAME: ${{ vars.AZURE_ENV_NAME }}
+      AZURE_LOCATION: ${{ vars.AZURE_LOCATION }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Install azd
+        uses: Azure/setup-azd@v2
+      - name: Log in with Azure (Federated Credentials)
+        run: |
+          azd auth login `
+            --client-id "$Env:AZURE_CLIENT_ID" `
+            --federated-credential-provider "github" `
+            --tenant-id "$Env:AZURE_TENANT_ID"
+        shell: pwsh
+      - name: Provision Infrastructure
+        run: azd provision --no-prompt
+        env:
+          NEIS_API_KEY: ${{ secrets.NEIS_API_KEY }}
+      - name: Deploy Application
+        run: azd deploy --no-prompt
+        env:
+          NEIS_API_KEY: ${{ secrets.NEIS_API_KEY }}
