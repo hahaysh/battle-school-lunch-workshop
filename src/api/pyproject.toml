@@ -19,8 +19,8 @@ dev = [
 [tool.pytest.ini_options]
 addopts = "-q"
 asyncio_mode = "auto"
+pythonpath = ["."]
 markers = [
   "unit: tests without I/O",
   "integration: API integration tests with mocked upstream I/O",
 ]
-
