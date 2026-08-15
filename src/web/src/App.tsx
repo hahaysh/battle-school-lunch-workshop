@@ -10,6 +10,7 @@ import {
   webLightTheme,
 } from "@fluentui/react-components";
 import { ApiError, getMeals, Meal, School, searchSchools } from "./lib/api";
+import AnalysisPage from "./AnalysisPage";
 import "./styles.css";
 
 type Step = 1 | 2 | 3;
@@ -86,6 +87,7 @@ export default function App() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [searched, setSearched] = useState(false);
+  const [page, setPage] = useState<"lookup" | "analysis">("lookup");
 
   async function onSearch(event: FormEvent) {
     event.preventDefault();
@@ -158,7 +160,11 @@ export default function App() {
           <p>학교를 찾고, 원하는 기간의 중식 메뉴를 한눈에 확인하세요.</p>
         </div>
       </header>
-      <main>
+      <nav className="top-tabs" aria-label="페이지 이동">
+        <Button type="button" aria-label="급식 조회 페이지" appearance={page === "lookup" ? "primary" : "subtle"} onClick={() => setPage("lookup")}>급식 조회</Button>
+        <Button type="button" appearance={page === "analysis" ? "primary" : "subtle"} onClick={() => setPage("analysis")}>급식 분석</Button>
+      </nav>
+      {page === "analysis" ? <main><AnalysisPage /></main> : <main>
         <ol className="steps" aria-label="조회 단계">
           {["학교 찾기", "기간 선택", "급식 확인"].map((label, index) => (
             <li key={label} aria-current={step === index + 1 ? "step" : undefined}
@@ -276,7 +282,7 @@ export default function App() {
             </>
           )}
         </section>
-      </main>
+      </main>}
       <footer>NEIS 학교 급식 정보를 바탕으로 제공합니다.</footer>
     </>
     </FluentProvider>
