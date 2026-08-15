@@ -15,6 +15,7 @@ class Settings(BaseSettings):
     foundry_project_endpoint: str = ""
     foundry_api_key: str = ""
     foundry_model: str = "gpt-4o-mini"
+    database_path: str = "./data/analyses.db"
 
     @property
     def allowed_origins(self) -> list[str]:

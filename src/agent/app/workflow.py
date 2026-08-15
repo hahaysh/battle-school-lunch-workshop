@@ -35,7 +35,11 @@ async def run_analysis(
             asyncio.to_thread(evaluate_area, key, school_meals) for key, _, _ in AREAS
         )))
         return SchoolAnalysis(
-            school={"schoolCode": school.schoolCode, "schoolName": school.schoolName},
+            school={
+                "officeCode": school.officeCode,
+                "schoolCode": school.schoolCode,
+                "schoolName": school.schoolName,
+            },
             totalScore=weighted_total(evaluations),
             areas=[to_area_score(evaluation) for evaluation in evaluations],
         )

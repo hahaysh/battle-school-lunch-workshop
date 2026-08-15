@@ -69,6 +69,7 @@ services:
       FOUNDRY_API_KEY: ${FOUNDRY_API_KEY:-}
       FOUNDRY_MODEL: ${FOUNDRY_MODEL:-gpt-4o-mini}
       ALLOWED_ORIGINS: http://localhost:3000
+      DATABASE_PATH: /app/data/analyses.db
     ports:
       - "8090:8090"
     depends_on:
@@ -86,6 +87,8 @@ services:
       start_period: 5s
     networks:
       - app
+    volumes:
+      - agent-data:/app/data
     restart: unless-stopped
 
   devui:
@@ -104,3 +107,6 @@ services:
 networks:
   app:
     internal: false
+
+volumes:
+  agent-data:

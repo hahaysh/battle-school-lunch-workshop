@@ -56,6 +56,7 @@ class QualityGate(BaseModel):
 
 
 class AnalysisResult(BaseModel):
+    analysisId: int | None = None
     schools: list[SchoolAnalysis]
     winner: str
     summary: str
