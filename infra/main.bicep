@@ -36,3 +36,4 @@ output AZURE_CONTAINER_REGISTRY_ENDPOINT string = resources.outputs.containerReg
 output AZURE_KEY_VAULT_NAME string = resources.outputs.keyVaultName
 output API_URL string = resources.outputs.apiUrl
 output WEB_URL string = resources.outputs.webUrl
+output MCP_URL string = resources.outputs.mcpUrl

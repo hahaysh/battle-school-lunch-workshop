@@ -12,6 +12,7 @@ var keyVaultName = 'kv${suffix}'
 var environmentNameResource = 'cae-${suffix}'
 var apiName = 'ca-api-${suffix}'
 var webName = 'ca-web-${suffix}'
+var mcpName = 'ca-mcp-${suffix}'
 
 resource logAnalytics 'Microsoft.OperationalInsights/workspaces@2023-09-01' = {
   name: 'log-${suffix}'
@@ -244,6 +245,93 @@ resource web 'Microsoft.App/containerApps@2024-03-01' = {
   }
 }
 
+resource mcp 'Microsoft.App/containerApps@2024-03-01' = {
+  name: mcpName
+  location: location
+  identity: {
+    type: 'SystemAssigned'
+  }
+  tags: union(tags, { 'azd-service-name': 'mcp' })
+  properties: {
+    managedEnvironmentId: managedEnvironment.id
+    configuration: {
+      activeRevisionsMode: 'Single'
+      ingress: {
+        external: true
+        targetPort: 8080
+        transport: 'http'
+      }
+      secrets: [
+        {
+          name: 'neis-api-key'
+          keyVaultUrl: '${keyVault.properties.vaultUri}secrets/neis-api-key'
+          identity: 'system'
+        }
+      ]
+    }
+    template: {
+      containers: [
+        {
+          name: 'mcp'
+          image: 'mcr.microsoft.com/azuredocs/containerapps-helloworld:latest'
+          resources: {
+            cpu: json('0.5')
+            memory: '1Gi'
+          }
+          env: [
+            {
+              name: 'NEIS_API_KEY'
+              secretRef: 'neis-api-key'
+            }
+            {
+              name: 'MCP_HOST'
+              value: '0.0.0.0'
+            }
+            {
+              name: 'MCP_PORT'
+              value: '8080'
+            }
+          ]
+          probes: [
+            {
+              type: 'Liveness'
+              httpGet: {
+                path: '/health'
+                port: 8080
+              }
+              initialDelaySeconds: 5
+              periodSeconds: 10
+            }
+            {
+              type: 'Readiness'
+              httpGet: {
+                path: '/health'
+                port: 8080
+              }
+              initialDelaySeconds: 5
+              periodSeconds: 10
+            }
+          ]
+        }
+      ]
+      scale: {
+        minReplicas: 1
+        maxReplicas: 2
+        rules: [
+          {
+            name: 'http-scaling'
+            http: {
+              metadata: {
+                concurrentRequests: '50'
+              }
+            }
+          }
+        ]
+      }
+    }
+  }
+}
+
 resource apiAcrPull 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
   name: guid(containerRegistry.id, api.name, 'acrpull')
   scope: containerRegistry
@@ -264,6 +352,16 @@ resource webAcrPull 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
   }
 }
 
+resource mcpAcrPull 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+  name: guid(containerRegistry.id, mcp.name, 'acrpull')
+  scope: containerRegistry
+  properties: {
+    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', '7f951dda-4ed3-4680-a7ca-43fe172d538d')
+    principalId: mcp.identity.principalId
+    principalType: 'ServicePrincipal'
+  }
+}
+
 resource apiKeyVaultAccess 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
   name: guid(keyVault.id, api.name, 'keyvault-secrets-user')
   scope: keyVault
@@ -274,7 +372,18 @@ resource apiKeyVaultAccess 'Microsoft.Authorization/roleAssignments@2022-04-01' 
   }
 }
 
+resource mcpKeyVaultAccess 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+  name: guid(keyVault.id, mcp.name, 'keyvault-secrets-user')
+  scope: keyVault
+  properties: {
+    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', '4633458b-17de-408a-b874-0445c86b69e6')
+    principalId: mcp.identity.principalId
+    principalType: 'ServicePrincipal'
+  }
+}
+
 output containerRegistryEndpoint string = containerRegistry.properties.loginServer
 output keyVaultName string = keyVault.name
 output apiUrl string = 'https://${api.properties.configuration.ingress.fqdn}'
 output webUrl string = 'https://${web.properties.configuration.ingress.fqdn}'
+output mcpUrl string = 'https://${mcp.properties.configuration.ingress.fqdn}/mcp'
