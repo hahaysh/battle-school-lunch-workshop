@@ -61,6 +61,7 @@ coverage.xml
 *.cover
 *.py,cover
 __pypackages__/
+src/agent/data/*.db
 .pdm.toml
 poetry.toml
 

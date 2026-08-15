@@ -1,8 +1,9 @@
 import json
+import sqlite3
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, StreamingResponse
 
@@ -13,16 +14,19 @@ from agent_framework.devui import DevServer
 
 from .config import get_settings
 from .mcp_client import McpLunchClient
+from .repository import AnalysisRepository
 from .schemas import AnalysisRequest
 from .workflow import run_analysis
 
 settings = get_settings()
+repository = AnalysisRepository(settings.database_path)
 AG_UI_WORKFLOW_TYPE = AgentFrameworkWorkflow
 DEV_UI_SERVER_TYPE = DevServer
 
 
 @asynccontextmanager
 async def lifespan(_: FastAPI) -> AsyncIterator[None]:
+    repository.initialize()
     yield
 
 
@@ -56,13 +60,24 @@ async def agui(request: AnalysisRequest) -> StreamingResponse:
 
         try:
             result = await run_analysis(request, McpLunchClient(settings), progress)
+            result.analysisId = repository.save(request.date, request.prompt, result)
             for item in queue:
                 yield event(item)
             yield event({"type": "RUN_FINISHED", "message": "분석이 완료되었습니다.", "result": result.model_dump(mode="json")})
-        except ValueError as exc:
+        except (ValueError, RuntimeError) as exc:
             yield event({"type": "RUN_ERROR", "message": str(exc)})
+        except sqlite3.Error:
+            yield event({"type": "RUN_ERROR", "message": "분석 결과를 저장하지 못했습니다."})
 
     return StreamingResponse(stream(), media_type="text/event-stream", headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
+
+
+@app.get("/analyses/{analysis_id}")
+async def get_analysis(analysis_id: int) -> dict:
+    analysis = repository.get(analysis_id)
+    if analysis is None:
+        raise HTTPException(status_code=404, detail="분석 결과를 찾을 수 없습니다.")
+    return analysis
 
 
 @app.exception_handler(ValueError)
