@@ -16,3 +16,9 @@ services:
     host: containerapp
     docker:
       path: ./Dockerfile
+  mcp:
+    project: ./src/mcp
+    language: python
+    host: containerapp
+    docker:
+      path: ./Dockerfile
